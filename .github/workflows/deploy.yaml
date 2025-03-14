@@ -1,26 +1,48 @@
 name: Deploy MultiDocker
+
 on:
   push:
     branches:
-      - master # check your repo, your default branch might be master!
+      - master # Change this if your default branch is different
 
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v4
-      - run: echo ${{ secrets.DOCKER_TOKEN }} | docker login --username ${{ secrets.DOCKER_USERNAME }} --password-stdin
-      - run: docker build -t katlego/react-test -f ./client/Dockerfile.dev ./client
-      - run: docker run -e CI=true katlego/react-test npm test
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-      - run: docker build -t katlego/multi-client ./client
-      - run: docker build -t katlego/multi-nginx ./nginx
-      - run: docker build -t katlego/multi-server ./server
-      - run: docker build -t katlego/multi-worker ./worker
+      - name: Set up QEMU (for multi-arch support)
+        uses: docker/setup-qemu-action@v3
 
-      - run: docker push katlego/multi-client
-      - run: docker push katlego/multi-nginx
-      - run: docker push katlego/multi-server
-      - run: docker push katlego/multi-worker
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
-      - run: docker logout
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_TOKEN }}
+
+      - name: Build and test React app
+        run: |
+          docker build -t katlego/react-test -f ./client/Dockerfile.dev ./client
+          docker run -e CI=true katlego/react-test npm test
+
+      - name: Build Docker images
+        run: |
+          docker build -t katlego/multi-client ./client
+          docker build -t katlego/multi-nginx ./nginx
+          docker build -t katlego/multi-server ./server
+          docker build -t katlego/multi-worker ./worker
+
+      - name: Push Docker images to Docker Hub
+        run: |
+          docker push katlego/multi-client
+          docker push katlego/multi-nginx
+          docker push katlego/multi-server
+          docker push katlego/multi-worker
+
+      - name: Log out of Docker Hub
+        run: docker logout
